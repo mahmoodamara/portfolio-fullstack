@@ -2,7 +2,6 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const pool = require('./run-init.js');
 
 const app = express();
 app.use(cors());
