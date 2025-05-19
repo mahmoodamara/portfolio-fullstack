@@ -83,7 +83,7 @@ export default function Chatbot() {
       <AnimatePresence>
         {isOpen && (
           <motion.div 
-            className="fixed bottom-6 right-6 w-96 h-[600px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden"
+            className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-96 sm:h-[600px] w-full h-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-none sm:rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden"
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -119,7 +119,7 @@ export default function Chatbot() {
                   className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 relative ${
+                    className={`max-w-[90%] sm:max-w-[85%] rounded-2xl px-4 py-3 relative ${
                       msg.type === "user" 
                         ? "bg-blue-500 text-white rounded-br-none" 
                         : "bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-none shadow-sm"
@@ -172,7 +172,7 @@ export default function Chatbot() {
                   animate={{ opacity: 1, y: 0 }}
                   className="flex justify-start"
                 >
-                  <div className="max-w-[85%] bg-white dark:bg-gray-700 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm">
+                  <div className="max-w-[90%] sm:max-w-[85%] bg-white dark:bg-gray-700 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm">
                     <div className="flex space-x-2">
                       <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
                       <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -187,12 +187,7 @@ export default function Chatbot() {
             {/* Input Area */}
             <div className="border-t border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-800">
               <div className="flex items-center space-x-2">
-                <button className="p-2 text-gray-500 hover:text-blue-500 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
-                  <MdAttachFile className="text-xl" />
-                </button>
-                <button className="p-2 text-gray-500 hover:text-blue-500 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
-                  <FaMicrophone className="text-lg" />
-                </button>
+              
                 <input
                   type="text"
                   className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
