@@ -18,6 +18,13 @@ import {
   FaExternalLinkAlt,
   FaChevronRight,
   FaStar,
+  FaGraduationCap,
+  FaBriefcase,
+  FaCertificate,
+  FaLink,
+  FaMapMarkerAlt,
+  FaPhone,
+  FaWhatsapp,
 } from "react-icons/fa";
 
 import {
@@ -36,6 +43,7 @@ import Tooltip from "./Tooltip";
 import Swal from "sweetalert2";
 
 const HomePage = () => {
+  // Existing states
   const [projects, setProjects] = useState([]);
   const [projectsCount, setProjectsCount] = useState(0);
   const [blogCount, setBlogCount] = useState(0);
@@ -45,120 +53,240 @@ const HomePage = () => {
   const [testimonials, setTestimonials] = useState([]);
   const [resumeUrl, setResumeUrl] = useState("");
 
+  // New states for additional data
+  const [aboutInfo, setAboutInfo] = useState({});
+  const [skills, setSkills] = useState([]);
+  const [experience, setExperience] = useState([]);
+  const [education, setEducation] = useState([]);
+  const [certifications, setCertifications] = useState([]);
+  const [recommendedLinks, setRecommendedLinks] = useState([]);
+  const [blogPosts, setBlogPosts] = useState([]);
+  const [gallery, setGallery] = useState([]);
+  const [analytics, setAnalytics] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     const fetchAll = async () => {
+      setLoading(true);
       try {
+        // Execute all API calls in parallel for better performance
         const [
+          // Stats
           projCnt,
           blogCnt,
           msgCnt,
           testCnt,
+
+          // Main content
           projList,
+          testList,
+          aboutData,
+          blogList,
+          galleryList,
+
+          // Charts
           projChart,
           msgChart,
-          testList,
-          aboutInfo,
+
+          // Profile data
+          skillsList,
+          experienceList,
+          educationList,
+          certificationsList,
+          linksList,
+          analyticsData,
         ] = await Promise.all([
-          API.get("/stats/projects-count"),
-          API.get("/stats/blog-count"),
-          API.get("/stats/messages-count"),
-          API.get("/stats/testimonials-count"),
-          API.get("/projects"),
-          API.get("/stats/projects-per-month"),
-          API.get("/stats/messages-per-month"),
-          API.get("/testimonials"),
-          API.get("/about"),
+          // Stats endpoints
+          API.get("/stats/projects-count").catch(() => ({
+            data: { count: 0 },
+          })),
+          API.get("/stats/blog-count").catch(() => ({ data: { count: 0 } })),
+          API.get("/stats/messages-count").catch(() => ({
+            data: { count: 0 },
+          })),
+          API.get("/stats/testimonials-count").catch(() => ({
+            data: { count: 0 },
+          })),
+
+          // Main content endpoints
+          API.get("/projects").catch(() => ({ data: [] })),
+          API.get("/testimonials").catch(() => ({ data: [] })),
+          API.get("/about").catch(() => ({ data: {} })),
+          API.get("/blog").catch(() => ({ data: [] })),
+          API.get("/gallery").catch(() => ({ data: [] })),
+
+          // Chart data endpoints
+          API.get("/stats/projects-per-month").catch(() => ({ data: [] })),
+          API.get("/stats/messages-per-month").catch(() => ({ data: [] })),
+
+          // Profile data endpoints
+          API.get("/skills").catch(() => ({ data: [] })),
+          API.get("/experience").catch(() => ({ data: [] })),
+          API.get("/education").catch(() => ({ data: [] })),
+          API.get("/certifications").catch(() => ({ data: [] })),
+          API.get("/links").catch(() => ({ data: [] })),
+          API.get("/analytics").catch(() => ({ data: [] })),
         ]);
 
-        setProjectsCount(projCnt.data.count);
-        setBlogCount(blogCnt.data.count);
-        setMessagesCount(msgCnt.data.count);
-        setTestimonialsCount(testCnt.data.count);
-        setProjects(projList.data.slice(0, 3));
+        // Set stats
+        setProjectsCount(projCnt.data.count || 0);
+        setBlogCount(blogCnt.data.count || 0);
+        setMessagesCount(msgCnt.data.count || 0);
+        setTestimonialsCount(testCnt.data.count || 0);
 
-        // build chart data
-        const months = projChart.data.map((p) => p.month);
+        // Set main content
+        setProjects(projList.data?.slice(0, 3) || []);
+        setTestimonials(testList.data?.slice(0, 3) || []);
+        setAboutInfo(aboutData.data || {});
+        setBlogPosts(blogList.data?.slice(0, 3) || []);
+        setGallery(galleryList.data?.slice(0, 6) || []);
+
+        // Set resume URL
+        setResumeUrl(aboutData.data?.resume_url || "");
+
+        // Build chart data
+        const months = projChart.data?.map((p) => p.month) || [];
         const merged = months.map((month) => ({
           month,
-          projects: +projChart.data.find((p) => p.month === month).count,
-          messages: +msgChart.data.find((m) => m.month === month)?.count || 0,
+          projects: +(
+            projChart.data?.find((p) => p.month === month)?.count || 0
+          ),
+          messages: +(
+            msgChart.data?.find((m) => m.month === month)?.count || 0
+          ),
         }));
         setChartData(merged);
 
-        setTestimonials(testList.data.slice(0, 3));
-        setResumeUrl(aboutInfo.data.resume_url || "");
+        // Set profile data
+        setSkills(skillsList.data || []);
+        setExperience(experienceList.data || []);
+        setEducation(educationList.data || []);
+        setCertifications(certificationsList.data || []);
+        setRecommendedLinks(linksList.data || []);
+        setAnalytics(analyticsData.data || []);
+
+        console.log("✅ All data loaded successfully");
       } catch (err) {
         console.error("❌ Error loading data:", err);
-        Swal.fire("Error", "Failed to load data", "error");
+        Swal.fire("Error", "Failed to load some data", "warning");
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchAll();
   }, []);
 
+  // Helper function to get social links from aboutInfo
+  const getSocialLinks = () => {
+    return [
+      {
+        icon: <FaEnvelope />,
+        url: aboutInfo.email
+          ? `mailto:${aboutInfo.email}`
+          : "mailto:mahmoud@example.com",
+        tooltip: "Email Me",
+      },
+      {
+        icon: <FaGithub />,
+        url: aboutInfo.github_link || "https://github.com/mahmoud-mustafa",
+        tooltip: "GitHub Profile",
+      },
+      {
+        icon: <FaLinkedin />,
+        url:
+          aboutInfo.linkedin_link || "https://linkedin.com/in/mahmoud-mustafa",
+        tooltip: "LinkedIn Profile",
+      },
+      {
+        icon: <FaTwitter />,
+        url: aboutInfo.twitter_link || "https://twitter.com/mahmoud_dev",
+        tooltip: "Twitter Profile",
+      },
+      ...(aboutInfo.whatsapp_link
+        ? [
+            {
+              icon: <FaWhatsapp />,
+              url: aboutInfo.whatsapp_link,
+              tooltip: "WhatsApp",
+            },
+          ]
+        : []),
+    ];
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-gray-900 text-white min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+          <p className="text-gray-300">Loading portfolio data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-gray-900 text-white min-h-screen flex flex-col">
       {/* Hero Section */}
       <main className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-        {/* الصورة الشخصية مع تأثيرات التحسين */}
+        {/* Profile Image */}
         <div className="relative group">
           <img
-            src="/image_mahmood.PNG"
-            alt="Mahmoud Mustafa"
+            src={aboutInfo.profile_image || "/image_mahmood.PNG"}
+            alt={aboutInfo.full_name || "Mahmoud Mustafa"}
             className="w-52 h-52 rounded-full border-4 border-indigo-500 shadow-lg mb-6 transition-all duration-500 group-hover:scale-105 group-hover:shadow-indigo-500/30"
             data-aos="zoom-in"
           />
-
           <div className="absolute inset-0 rounded-full border-4 border-transparent group-hover:border-indigo-300 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none"></div>
         </div>
 
-        {/* العنوان والوصف المحسن */}
+        {/* Name and Title */}
         <h1
           className="text-4xl font-bold mb-2 text-indigo-400 bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 to-purple-400"
           data-aos="fade-up"
           data-aos-delay="200"
         >
-          Mahmoud Mustafa
+          {aboutInfo.full_name || "Mahmoud Mustafa"}
         </h1>
 
+        {/* Bio */}
         <p
           className="text-lg text-gray-300 max-w-xl mb-6 leading-relaxed"
           data-aos="fade-up"
           data-aos-delay="400"
         >
-          Full Stack Developer with {new Date().getFullYear() - 2015}+ years of
-          experience | Passionate about modern web technologies, AI, and clean
-          UI | Creating digital experiences that matter
+          {aboutInfo.bio ||
+            `Full Stack Developer with ${
+              new Date().getFullYear() - 2015
+            }+ years of experience | Passionate about modern web technologies, AI, and clean UI | Creating digital experiences that matter`}
         </p>
 
-        {/* روابط التواصل الاجتماعي المحسنة */}
+        {/* Location and Contact Info */}
+        {(aboutInfo.location || aboutInfo.phone) && (
+          <div className="flex items-center gap-4 mb-4 text-gray-400">
+            {aboutInfo.location && (
+              <div className="flex items-center gap-1">
+                <FaMapMarkerAlt className="text-indigo-400" />
+                <span className="text-sm">{aboutInfo.location}</span>
+              </div>
+            )}
+            {aboutInfo.phone && (
+              <div className="flex items-center gap-1">
+                <FaPhone className="text-indigo-400" />
+                <span className="text-sm">{aboutInfo.phone}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Social Links */}
         <div
           className="flex gap-6 mt-4"
           data-aos="fade-up"
           data-aos-delay="600"
         >
-          {[
-            {
-              icon: <FaEnvelope />,
-              url: "mailto:mahmoud@example.com",
-              tooltip: "Email Me",
-            },
-            {
-              icon: <FaGithub />,
-              url: "https://github.com/mahmoud-mustafa",
-              tooltip: "GitHub Profile",
-            },
-            {
-              icon: <FaLinkedin />,
-              url: "https://linkedin.com/in/mahmoud-mustafa",
-              tooltip: "LinkedIn Profile",
-            },
-            {
-              icon: <FaTwitter />,
-              url: "https://twitter.com/mahmoud_dev",
-              tooltip: "Twitter Profile",
-            },
-          ].map((item, index) => (
+          {getSocialLinks().map((item, index) => (
             <Tooltip key={index} content={item.tooltip} placement="bottom">
               <a
                 href={item.url}
@@ -172,7 +300,7 @@ const HomePage = () => {
           ))}
         </div>
 
-        {/* الأزرار المحسنة */}
+        {/* Action Buttons */}
         <div
           className="mt-8 flex flex-wrap items-center justify-center gap-4"
           data-aos="fade-up"
@@ -202,7 +330,7 @@ const HomePage = () => {
           </motion.div>
         </div>
 
-        {/* الإحصائيات السريعة المحسنة */}
+        {/* Enhanced Stats with Dynamic Data */}
         <div
           className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12 w-full max-w-4xl"
           data-aos="fade-up"
@@ -238,7 +366,35 @@ const HomePage = () => {
           ))}
         </div>
 
-        {/* مخطط النشاط المحسن */}
+        {/* Quick Skills Overview */}
+        {skills.length > 0 && (
+          <div
+            className="mt-8 w-full max-w-4xl"
+            data-aos="fade-up"
+            data-aos-delay="1400"
+          >
+            <h3 className="text-xl font-bold text-indigo-400 mb-4 text-center">
+              Top Skills
+            </h3>
+            <div className="flex flex-wrap justify-center gap-3">
+              {skills.slice(0, 8).map((skill, index) => (
+                <span
+                  key={skill.id}
+                  className="bg-indigo-900/30 text-indigo-300 px-4 py-2 rounded-full text-sm font-medium border border-indigo-800 hover:border-indigo-600 transition-colors"
+                >
+                  {skill.skill_name}
+                  {skill.level && (
+                    <span className="ml-2 text-xs text-gray-400">
+                      ({skill.level})
+                    </span>
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Activity Chart */}
         <div
           className="mt-12 w-full max-w-5xl bg-gradient-to-br from-gray-800 to-gray-900 p-6 rounded-xl shadow-2xl border border-gray-700 hover:border-indigo-500 transition-all duration-300"
           data-aos="fade-up"
@@ -248,11 +404,6 @@ const HomePage = () => {
             <h2 className="text-xl font-bold text-indigo-400">
               <FaChartLine className="inline mr-2" /> Activity (Last 6 Months)
             </h2>
-            <select className="bg-gray-700 text-gray-200 text-sm rounded px-3 py-1 border border-gray-600 focus:border-indigo-500 focus:outline-none">
-              <option>Last 6 Months</option>
-              <option>Last Year</option>
-              <option>All Time</option>
-            </select>
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart
@@ -315,11 +466,9 @@ const HomePage = () => {
         <Tooltip id="my-tooltip" />
       </main>
 
-      {/* Latest Projects */}
       {/* Latest Projects Section */}
       <section className="relative py-20 bg-gradient-to-b from-gray-900 to-gray-800 overflow-hidden">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Section Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -335,7 +484,6 @@ const HomePage = () => {
             </p>
           </motion.div>
 
-          {/* Projects Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {projects.slice(0, 3).map((project, index) => (
               <motion.div
@@ -346,9 +494,7 @@ const HomePage = () => {
                 viewport={{ once: true, margin: "-50px" }}
                 className="group relative h-full"
               >
-                {/* Project Card */}
                 <div className="h-full flex flex-col bg-gray-800 rounded-xl overflow-hidden shadow-2xl hover:shadow-indigo-500/20 transition-all duration-500 border border-gray-700 hover:border-indigo-500 transform group-hover:-translate-y-2">
-                  {/* Project Image */}
                   <div className="relative h-48 overflow-hidden">
                     {project.image_url ? (
                       <img
@@ -362,7 +508,6 @@ const HomePage = () => {
                         <FaImage className="text-4xl" />
                       </div>
                     )}
-                    {/* Overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-6">
                       <button className="text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                         View Details
@@ -370,10 +515,8 @@ const HomePage = () => {
                     </div>
                   </div>
 
-                  {/* Project Content */}
                   <div className="p-6 flex-1 flex flex-col">
                     <div className="flex-1">
-                      {/* Title and Date */}
                       <div className="flex justify-between items-start mb-3">
                         <h3 className="text-xl font-bold text-white line-clamp-2">
                           {project.title}
@@ -387,13 +530,11 @@ const HomePage = () => {
                         )}
                       </div>
 
-                      {/* Description */}
                       <p className="text-gray-400 text-sm mb-4 line-clamp-3">
                         {project.description || "No description available"}
                       </p>
                     </div>
 
-                    {/* Tech Stack */}
                     {project.tech_stack && (
                       <div className="mb-4">
                         <div className="flex flex-wrap gap-2">
@@ -417,7 +558,6 @@ const HomePage = () => {
                       </div>
                     )}
 
-                    {/* Project Links */}
                     <div className="flex justify-between items-center pt-4 border-t border-gray-700/50">
                       <div className="flex space-x-4">
                         {project.github_link && (
@@ -463,7 +603,6 @@ const HomePage = () => {
             ))}
           </div>
 
-          {/* View All Button */}
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -481,7 +620,6 @@ const HomePage = () => {
           </motion.div>
         </div>
 
-        {/* Decorative Elements */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
           <div className="absolute top-20 -left-20 w-64 h-64 bg-indigo-500/10 rounded-full filter blur-3xl"></div>
           <div className="absolute bottom-10 -right-20 w-64 h-64 bg-purple-500/10 rounded-full filter blur-3xl"></div>
@@ -491,7 +629,6 @@ const HomePage = () => {
       {/* Testimonials Section */}
       <section className="relative py-20 bg-gray-900 overflow-hidden">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
-          {/* Section Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -510,7 +647,6 @@ const HomePage = () => {
             </p>
           </motion.div>
 
-          {/* Testimonials Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {testimonials.map((testimonial, index) => (
               <motion.div
@@ -521,20 +657,16 @@ const HomePage = () => {
                 viewport={{ once: true }}
                 className="group"
               >
-                {/* Testimonial Card */}
                 <div className="h-full bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl border border-gray-700 hover:border-indigo-500 transition-all duration-500 shadow-lg hover:shadow-indigo-500/10 relative overflow-hidden">
-                  {/* Decorative Quote */}
                   <FaQuoteLeft className="absolute -top-2 -right-2 text-7xl text-indigo-900/20 z-0" />
 
-                  {/* Testimonial Content */}
                   <div className="relative z-10">
-                    {/* Rating */}
                     <div className="flex mb-4">
                       {[...Array(5)].map((_, i) => (
                         <FaStar
                           key={i}
                           className={`text-lg ${
-                            i < testimonial.rating
+                            i < (testimonial.rating || 5)
                               ? "text-yellow-400"
                               : "text-gray-600"
                           }`}
@@ -542,17 +674,15 @@ const HomePage = () => {
                       ))}
                     </div>
 
-                    {/* Feedback */}
                     <p className="text-gray-300 mb-6 text-justify leading-relaxed">
                       "{testimonial.feedback}"
                     </p>
 
-                    {/* Client Info */}
                     <div className="flex items-center">
-                      {testimonial.avatar && (
+                      {testimonial.image_url && (
                         <div className="mr-4">
                           <img
-                            src={testimonial.avatar}
+                            src={testimonial.image_url}
                             alt={testimonial.name}
                             className="w-12 h-12 rounded-full object-cover border-2 border-indigo-500"
                           />
@@ -579,6 +709,7 @@ const HomePage = () => {
               </motion.div>
             ))}
           </div>
+
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -596,6 +727,8 @@ const HomePage = () => {
           </motion.div>
         </div>
       </section>
+
+      {/* Recommended Links Section (if available) */}
     </div>
   );
 };
