@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import API from "../../api/axios";
 import {
   FaGithub,
@@ -13,10 +13,61 @@ import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 import Tooltip from "./Tooltip";
 
+// Analytics utility functions
+const analytics = {
+  // Simple page view tracking that matches the existing analytics table structure
+  trackPageView: async (pageName) => {
+    try {
+      // Send to analytics endpoint (fire and forget)
+      API.post('/analytics', {
+        page_name: pageName
+      }).catch(err => {
+        console.warn('Analytics tracking failed:', err);
+      });
+    } catch (error) {
+      console.warn('Analytics error:', error);
+    }
+  }
+};
+
+// Custom hook for analytics tracking (simplified)
+const useAnalytics = () => {
+  const startTime = useRef(Date.now());
+
+  // Track page entry
+  useEffect(() => {
+    analytics.trackPageView('projects_page');
+  }, []);
+
+  return {
+    // Simplified tracking functions for console logging
+    trackProjectView: (projectId, projectTitle) => {
+      console.log('📊 Project viewed:', projectTitle);
+    },
+    
+    trackProjectClick: (type, projectId, projectTitle, url) => {
+      console.log('📊 Project click:', type, projectTitle, url);
+    },
+
+    trackSearch: (query, resultsCount) => {
+      console.log('📊 Search performed:', query, 'Results:', resultsCount);
+    },
+
+    trackFilter: (filterType, filterValue, resultsCount) => {
+      console.log('📊 Filter applied:', filterType, filterValue, 'Results:', resultsCount);
+    },
+
+    trackPagination: (page, totalProjects) => {
+      console.log('📊 Pagination used:', 'Page', page, 'Total:', totalProjects);
+    }
+  };
+};
+
 const ProjectPageUser = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const loadStartTime = useRef(Date.now());
 
   // Filters
   const [searchText, setSearchText] = useState("");
@@ -26,14 +77,25 @@ const ProjectPageUser = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const perPage = 6;
 
+  // Analytics
+  const { trackProjectView, trackProjectClick, trackSearch, trackFilter, trackPagination } = useAnalytics();
+  const searchTimeout = useRef(null);
+  const projectViewTimeouts = useRef({});
+
   useEffect(() => {
     const fetchProjects = async () => {
       try {
         const { data } = await API.get("/projects");
         setProjects(data);
+        
+        // Track loading performance
+        const loadTime = Date.now() - loadStartTime.current;
+        console.log('📊 Projects loaded:', loadTime + 'ms', data.length + ' projects');
       } catch (err) {
         console.error("Failed to fetch projects:", err);
         setError("Failed to load projects. Please try again later.");
+        
+        console.log('📊 Projects load error:', err.message);
       } finally {
         setLoading(false);
       }
@@ -85,6 +147,66 @@ const ProjectPageUser = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentPage]);
 
+  // Analytics handlers
+  const handleSearchChange = useCallback((value) => {
+    setSearchText(value);
+    setCurrentPage(1);
+
+    // Debounced search tracking
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
+    
+    searchTimeout.current = setTimeout(() => {
+      if (value.trim()) {
+        const resultsCount = projects.filter(p => 
+          p.title.toLowerCase().includes(value.toLowerCase()) ||
+          (p.description || "").toLowerCase().includes(value.toLowerCase())
+        ).length;
+        trackSearch(value.trim(), resultsCount);
+      }
+    }, 1000);
+  }, [projects, trackSearch]);
+
+  const handleTechFilterChange = useCallback((value) => {
+    setTechFilter(value);
+    setCurrentPage(1);
+    
+    const resultsCount = value === "all" ? projects.length : 
+      projects.filter(p => 
+        (p.tech_stack || "")
+          .split(",")
+          .map(t => t.trim().toLowerCase())
+          .includes(value.toLowerCase())
+      ).length;
+    
+    trackFilter('technology', value, resultsCount);
+  }, [projects, trackFilter]);
+
+  const handlePageChange = useCallback((newPage) => {
+    setCurrentPage(newPage);
+    trackPagination(newPage, filteredProjects.length);
+  }, [filteredProjects.length, trackPagination]);
+
+  const handleProjectMouseEnter = useCallback((project) => {
+    // Track project view after 2 seconds of hover
+    projectViewTimeouts.current[project.id] = setTimeout(() => {
+      trackProjectView(project.id, project.title);
+    }, 2000);
+  }, [trackProjectView]);
+
+  const handleProjectMouseLeave = useCallback((project) => {
+    // Cancel the view tracking if mouse leaves quickly
+    if (projectViewTimeouts.current[project.id]) {
+      clearTimeout(projectViewTimeouts.current[project.id]);
+      delete projectViewTimeouts.current[project.id];
+    }
+  }, []);
+
+  const handleProjectLinkClick = useCallback((type, project, url) => {
+    trackProjectClick(type, project.id, project.title, url);
+  }, [trackProjectClick]);
+
   // Helper functions
   const isNew = (dateStr) => {
     if (!dateStr) return false;
@@ -99,6 +221,13 @@ const ProjectPageUser = () => {
       day: 'numeric'
     }) : 'Unknown date';
   };
+
+  // Track no results found
+  useEffect(() => {
+    if (!loading && filteredProjects.length === 0 && (searchText || techFilter !== "all")) {
+      console.log('📊 No results found:', 'Search:', searchText, 'Filter:', techFilter);
+    }
+  }, [loading, filteredProjects.length, searchText, techFilter]);
 
   if (error) {
     return (
@@ -151,10 +280,7 @@ const ProjectPageUser = () => {
                 type="text"
                 placeholder="Search projects by title or description..."
                 value={searchText}
-                onChange={(e) => {
-                  setSearchText(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="w-full bg-gray-700 text-white pl-10 pr-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -165,10 +291,7 @@ const ProjectPageUser = () => {
               </div>
               <select
                 value={techFilter}
-                onChange={(e) => {
-                  setTechFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={(e) => handleTechFilterChange(e.target.value)}
                 className="w-full bg-gray-700 text-white pl-10 pr-4 py-3 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="all">All Technologies</option>
@@ -219,6 +342,8 @@ const ProjectPageUser = () => {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.3, delay: index * 0.05 }}
                   layout
+                  onMouseEnter={() => handleProjectMouseEnter(project)}
+                  onMouseLeave={() => handleProjectMouseLeave(project)}
                   className="bg-gray-800 rounded-xl overflow-hidden shadow-lg hover:shadow-indigo-500/20 transition-shadow duration-300 border border-gray-700 hover:border-indigo-500"
                 >
                   {/* Project Image */}
@@ -266,7 +391,10 @@ const ProjectPageUser = () => {
                         <div className="flex flex-wrap gap-2">
                           {project.tech_stack.split(",").map((tech) => (
                             <Tooltip key={tech} content={tech.trim()}>
-                              <span className="bg-indigo-900/50 text-indigo-300 text-xs px-3 py-1 rounded-full">
+                              <span 
+                                className="bg-indigo-900/50 text-indigo-300 text-xs px-3 py-1 rounded-full cursor-pointer hover:bg-indigo-800/50"
+                                onClick={() => handleTechFilterChange(tech.trim().toLowerCase())}
+                              >
                                 {tech.trim()}
                               </span>
                             </Tooltip>
@@ -284,6 +412,7 @@ const ProjectPageUser = () => {
                               href={project.github_link}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={() => handleProjectLinkClick('github', project, project.github_link)}
                               className="text-gray-400 hover:text-white transition-colors"
                             >
                               <FaGithub className="text-xl" />
@@ -296,6 +425,7 @@ const ProjectPageUser = () => {
                               href={project.live_demo_link}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={() => handleProjectLinkClick('demo', project, project.live_demo_link)}
                               className="text-gray-400 hover:text-white transition-colors"
                             >
                               <FaExternalLinkAlt className="text-xl" />
@@ -306,6 +436,7 @@ const ProjectPageUser = () => {
                       {project.details_link && (
                         <a
                           href={project.details_link}
+                          onClick={() => handleProjectLinkClick('details', project, project.details_link)}
                           className="text-sm text-indigo-400 hover:text-indigo-300 font-medium"
                         >
                           View Details →
@@ -339,7 +470,7 @@ const ProjectPageUser = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
                 disabled={currentPage === 1}
                 className={clsx(
                   "px-4 py-2 rounded-lg transition-colors flex items-center",
@@ -368,7 +499,7 @@ const ProjectPageUser = () => {
                   return (
                     <button
                       key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
+                      onClick={() => handlePageChange(pageNum)}
                       className={clsx(
                         "w-10 h-10 rounded-lg transition-colors",
                         currentPage === pageNum
@@ -385,7 +516,7 @@ const ProjectPageUser = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
                 disabled={currentPage === totalPages}
                 className={clsx(
                   "px-4 py-2 rounded-lg transition-colors flex items-center",

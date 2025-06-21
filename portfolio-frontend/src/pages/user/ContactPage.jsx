@@ -4,6 +4,53 @@ import { RiCustomerService2Fill } from "react-icons/ri";
 import API from "../../api/axios";
 import Swal from "sweetalert2";
 
+// Analytics utility functions
+const analytics = {
+  // Simple page view tracking that matches the existing analytics table structure
+  trackPageView: async (pageName) => {
+    try {
+      // Send to analytics endpoint (fire and forget)
+      API.post('/analytics', {
+        page_name: pageName
+      }).catch(err => {
+        console.warn('Analytics tracking failed:', err);
+      });
+    } catch (error) {
+      console.warn('Analytics error:', error);
+    }
+  }
+};
+
+// Custom hook for analytics tracking (simplified)
+const useContactAnalytics = () => {
+  // Track page entry
+  useEffect(() => {
+    analytics.trackPageView('contact_page');
+  }, []);
+
+  return {
+    trackStepChange: (fromStep, toStep) => {
+      console.log('📊 Contact step change:', fromStep, '→', toStep);
+    },
+    
+    trackContactMethodChosen: (method) => {
+      console.log('📊 Contact method chosen:', method);
+    },
+
+    trackMessageSent: (method, messageLength) => {
+      console.log('📊 Message sent:', method, 'Length:', messageLength);
+    },
+
+    trackFormSubmission: (formType, success) => {
+      console.log('📊 Form submission:', formType, 'Success:', success);
+    },
+
+    trackChatLoaded: (messageCount) => {
+      console.log('📊 Chat loaded:', messageCount, 'messages');
+    }
+  };
+};
+
 const ContactPage = () => {
   // Email state
   const [email, setEmail] = useState("");
@@ -24,6 +71,9 @@ const ContactPage = () => {
   });
   const [formSending, setFormSending] = useState(false);
 
+  // Analytics
+  const { trackStepChange, trackContactMethodChosen, trackMessageSent, trackFormSubmission, trackChatLoaded } = useContactAnalytics();
+
   // Scroll to bottom when a new message arrives
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -31,6 +81,8 @@ const ContactPage = () => {
 
   // After entering email, fetch messages and replies
   const loadChat = async () => {
+    trackContactMethodChosen('live_chat');
+    
     try {
       const res = await API.get(`/messages/user?email=${encodeURIComponent(email)}`);
       const messages = res.data;
@@ -58,6 +110,8 @@ const ContactPage = () => {
       });
       
       setChat(convo);
+      trackChatLoaded(convo.length);
+      trackStepChange("chooseContactMethod", "chat");
       setStep("chat");
     } catch (err) {
       console.error(err);
@@ -85,6 +139,7 @@ const ContactPage = () => {
       });
     }
     // Show contact method options after entering email
+    trackStepChange("enterEmail", "chooseContactMethod");
     setStep("chooseContactMethod");
   };
 
@@ -94,15 +149,19 @@ const ContactPage = () => {
     setSending(true);
 
     const now = new Date().toISOString();
-    setChat((prev) => [...prev, { from: "user", text: input, time: now, is_read: false }]);
+    const messageText = input;
+    setChat((prev) => [...prev, { from: "user", text: messageText, time: now, is_read: false }]);
     setInput("");
 
     try {
       await API.post("/messages", {
         name: name || "Visitor",
         email,
-        message: input,
+        message: messageText,
       });
+      
+      trackMessageSent('chat', messageText.length);
+      
       // Reload conversation to see any updates
       setTimeout(loadChat, 1000);
     } catch {
@@ -116,6 +175,7 @@ const ContactPage = () => {
       });
       // Revert message addition if sending fails
       setChat(prev => prev.slice(0, -1));
+      trackMessageSent('chat_failed', messageText.length);
     } finally {
       setSending(false);
     }
@@ -133,6 +193,9 @@ const ContactPage = () => {
         message: `[${formData.subject}] ${formData.message}`
       });
       
+      trackFormSubmission('contact_form', true);
+      trackMessageSent('form', formData.message.length);
+      
       Swal.fire({
         title: "Sent",
         text: "Your inquiry has been sent successfully. We'll get back to you soon.",
@@ -142,8 +205,10 @@ const ContactPage = () => {
         confirmButtonColor: "#6366f1"
       });
       setFormData({ name: "", subject: "", message: "" });
+      trackStepChange("form", "chooseContactMethod");
       setStep("chooseContactMethod");
     } catch (error) {
+      trackFormSubmission('contact_form', false);
       Swal.fire({
         title: "Error",
         text: "Failed to send inquiry, please try again later.",
@@ -160,6 +225,23 @@ const ContactPage = () => {
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleChooseForm = () => {
+    trackContactMethodChosen('contact_form');
+    trackStepChange("chooseContactMethod", "form");
+    setStep("form");
+  };
+
+  const handleBackToEmailEntry = () => {
+    trackStepChange("chooseContactMethod", "enterEmail");
+    setStep("enterEmail");
+  };
+
+  const handleBackToChooseMethod = () => {
+    const currentStep = step;
+    trackStepChange(currentStep, "chooseContactMethod");
+    setStep("chooseContactMethod");
   };
 
   // Email entry interface
@@ -242,7 +324,7 @@ const ContactPage = () => {
               </button>
               
               <button
-                onClick={() => setStep("form")}
+                onClick={handleChooseForm}
                 className="group bg-gray-700 hover:bg-purple-600 p-6 rounded-xl flex flex-col items-center transition-all transform hover:-translate-y-1 hover:shadow-lg"
               >
                 <div className="bg-purple-600 group-hover:bg-purple-700 p-4 rounded-full mb-4 transition">
@@ -263,7 +345,7 @@ const ContactPage = () => {
                 Logged in as: <span className="font-medium text-gray-200">{name}</span> (<span className="font-mono text-gray-300">{email}</span>)
               </div>
               <button
-                onClick={() => setStep("enterEmail")}
+                onClick={handleBackToEmailEntry}
                 className="text-sm text-gray-400 hover:text-gray-300 flex items-center"
               >
                 <FaArrowLeft className="mr-1" /> Change Email
@@ -330,7 +412,7 @@ const ContactPage = () => {
             <div className="mt-8 flex justify-between items-center">
               <button
                 type="button"
-                onClick={() => setStep("chooseContactMethod")}
+                onClick={handleBackToChooseMethod}
                 className="px-6 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center transition"
               >
                 <FaArrowLeft className="mr-2" /> Back
@@ -372,7 +454,7 @@ const ContactPage = () => {
       <div className="bg-gray-800 py-5 px-6 shadow-lg flex justify-between items-center">
         <div className="flex items-center space-x-3">
           <button
-            onClick={() => setStep("chooseContactMethod")}
+            onClick={handleBackToChooseMethod}
             className="text-gray-400 hover:text-gray-300 p-1 rounded-full hover:bg-gray-700 transition"
           >
             <FaArrowLeft className="text-lg" />

@@ -16,6 +16,8 @@ import ContactPage from "./pages/user/ContactPage";
 import ProjectPageUser from "./pages/user/ProjectPageUser";
 import UserBlogPage from "./pages/user/UserBlogPage";
 import UserTestimonialsPage from "./pages/user/UserTestimonialsPage";
+import AboutPage from "./pages/user/AboutPage";
+import ResumePage from "./pages/user/ResumePage";
 
 // يمكنك لاحقًا إضافة:
 // import ProjectsPage from "./pages/user/ProjectsPage";
@@ -33,6 +35,11 @@ import AdminAboutPage from "./pages/admin/AdminAboutPage";
 import AdminGalleryPage from "./pages/admin/AdminGalaryPage";
 import AdminTestimonialsPage from "./pages/admin/AdminTestimonialsPage";
 import AdminBlogPostsPage from "./pages/admin/AdminBlogPostsPage";
+import AdminSkillsPage from "./pages/admin/AdminSkillsPage";
+import AdminExperiencePage from "./pages/admin/AdminExperiencePage";
+import AdminEducationPage from "./pages/admin/AdminEducationPage";
+import AdminCertificationsPage from "./pages/admin/AdminCertificationsPage";
+import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
 
 function App() {
   useEffect(() => {
@@ -76,6 +83,15 @@ function App() {
             }
           />
 
+           <Route
+            path="/about-us"
+            element={
+              <Layout>
+                <AboutPage />
+              </Layout>
+            }
+          />
+
           <Route
             path="/projects"
             element={
@@ -99,6 +115,15 @@ function App() {
             element={
               <Layout>
                 <UserTestimonialsPage />
+              </Layout>
+            }
+          />
+
+          <Route
+            path="/resumes"
+            element={
+              <Layout>
+                <ResumePage />
               </Layout>
             }
           />
@@ -187,6 +212,47 @@ function App() {
             element={
               <ProtectedRoute>
                 <AdminBlogPostsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/skills"
+            element={
+              <ProtectedRoute>
+                <AdminSkillsPage/>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/experiences"
+            element={
+              <ProtectedRoute>
+                <AdminExperiencePage/>
+              </ProtectedRoute>
+            }
+          />
+            <Route
+            path="/admin/educations"
+            element={
+              <ProtectedRoute>
+                <AdminEducationPage/>
+              </ProtectedRoute>
+            }
+          />
+
+            <Route
+            path="/admin/certifications"
+            element={
+              <ProtectedRoute>
+                <AdminCertificationsPage/>
+              </ProtectedRoute>
+            }
+          />
+           <Route
+            path="/admin/analytics"
+            element={
+              <ProtectedRoute>
+                <AdminAnalyticsPage/>
               </ProtectedRoute>
             }
           />

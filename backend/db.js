@@ -14,4 +14,14 @@ const pool = new Pool({
   }
 });
 
+// تحقق فوري عند تشغيل التطبيق
+pool.connect()
+  .then(client => {
+    console.log("✅ Connected to PostgreSQL database successfully.");
+    client.release(); // حرر الاتصال بعد التحقق
+  })
+  .catch(err => {
+    console.error("❌ Failed to connect to PostgreSQL database:", err.message);
+  });
+
 module.exports = pool;
