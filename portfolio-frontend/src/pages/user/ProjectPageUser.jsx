@@ -92,7 +92,7 @@ const ProjectPageUser = () => {
   const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [galleryImages, setGalleryImages] = useState([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-
+  console.log(galleryImages)
   // Analytics
   const { trackProjectView, trackProjectClick, trackSearch, trackFilter, trackPagination, trackGalleryView } = useAnalytics();
   const searchTimeout = useRef(null);

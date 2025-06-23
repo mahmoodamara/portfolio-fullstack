@@ -180,6 +180,8 @@ const HomePage = () => {
         setRecommendedLinks(linksList.data || []);
         setAnalytics(analyticsData.data || []);
 
+        console.log(galleryImages)
+
         console.log("✅ All data loaded successfully");
       } catch (err) {
         console.error("❌ Error loading data:", err);
