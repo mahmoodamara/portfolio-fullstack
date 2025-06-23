@@ -57,3 +57,46 @@ exports.deleteProject = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete project' });
   }
 };
+
+// Get project images
+exports.getProjectImages = async (req, res) => {
+  const { id } = req.params; // project ID
+  try {
+    const result = await pool.query(
+      'SELECT * FROM project_images WHERE project_id = $1 ORDER BY created_at ASC',
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching project images:', err);
+    res.status(500).json({ message: 'Failed to fetch project images' });
+  }
+};
+
+// Add image to project
+exports.addProjectImage = async (req, res) => {
+  const { id } = req.params; // project ID
+  const { image_url } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO project_images (project_id, image_url) VALUES ($1, $2) RETURNING *',
+      [id, image_url]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Error adding project image:', err);
+    res.status(500).json({ message: 'Failed to add project image' });
+  }
+};
+
+// Delete project image
+exports.deleteProjectImage = async (req, res) => {
+  const { imageId } = req.params;
+  try {
+    await pool.query('DELETE FROM project_images WHERE id = $1', [imageId]);
+    res.json({ message: 'Project image deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting project image:', err);
+    res.status(500).json({ message: 'Failed to delete project image' });
+  }
+};
