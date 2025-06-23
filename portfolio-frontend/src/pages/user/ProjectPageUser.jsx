@@ -7,7 +7,12 @@ import {
   FaChevronRight,
   FaSearch,
   FaFilter,
-  FaSpinner
+  FaSpinner,
+  FaImages,
+  FaTimes,
+  FaEye,
+  FaCopy,
+  FaImage
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
@@ -59,6 +64,10 @@ const useAnalytics = () => {
 
     trackPagination: (page, totalProjects) => {
       console.log('📊 Pagination used:', 'Page', page, 'Total:', totalProjects);
+    },
+
+    trackGalleryView: (projectId, projectTitle) => {
+      console.log('📊 Gallery viewed:', projectTitle);
     }
   };
 };
@@ -77,8 +86,15 @@ const ProjectPageUser = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const perPage = 6;
 
+  // Gallery states
+  const [additionalImages, setAdditionalImages] = useState({});
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
+  const [galleryImages, setGalleryImages] = useState([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
   // Analytics
-  const { trackProjectView, trackProjectClick, trackSearch, trackFilter, trackPagination } = useAnalytics();
+  const { trackProjectView, trackProjectClick, trackSearch, trackFilter, trackPagination, trackGalleryView } = useAnalytics();
   const searchTimeout = useRef(null);
   const projectViewTimeouts = useRef({});
 
@@ -87,6 +103,19 @@ const ProjectPageUser = () => {
       try {
         const { data } = await API.get("/projects");
         setProjects(data);
+        
+        // Fetch additional images for each project
+        const imagesCount = {};
+        for (const project of data) {
+          try {
+            const imagesRes = await API.get(`/projects/${project.id}/images`);
+            imagesCount[project.id] = imagesRes.data;
+          } catch (err) {
+            console.error(`Error fetching images for project ${project.id}:`, err);
+            imagesCount[project.id] = [];
+          }
+        }
+        setAdditionalImages(imagesCount);
         
         // Track loading performance
         const loadTime = Date.now() - loadStartTime.current;
@@ -146,6 +175,75 @@ const ProjectPageUser = () => {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentPage]);
+
+  // Gallery functions
+  const fetchProjectImages = async (projectId) => {
+    try {
+      const res = await API.get(`/projects/${projectId}/images`);
+      return res.data;
+    } catch (err) {
+      console.error("Error fetching project images:", err);
+      return [];
+    }
+  };
+
+  const openGalleryModal = async (project) => {
+    setSelectedProject(project);
+    setShowGalleryModal(true);
+    
+    // Track gallery view
+    trackGalleryView(project.id, project.title);
+    
+    // Fetch all images for the project
+    const images = await fetchProjectImages(project.id);
+    const allImages = [];
+    
+    // Add main image first
+    if (project.image_url) {
+      allImages.push({
+        id: 'main',
+        image_url: project.image_url,
+        isMain: true,
+        created_at: project.created_at
+      });
+    }
+    
+    // Add additional images
+    images.forEach(img => {
+      allImages.push({
+        ...img,
+        isMain: false
+      });
+    });
+    
+    setGalleryImages(allImages);
+    setCurrentImageIndex(0);
+  };
+
+  const nextImage = () => {
+    setCurrentImageIndex((prev) => 
+      prev === galleryImages.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  const prevImage = () => {
+    setCurrentImageIndex((prev) => 
+      prev === 0 ? galleryImages.length - 1 : prev - 1
+    );
+  };
+
+  const closeGalleryModal = () => {
+    setShowGalleryModal(false);
+    setSelectedProject(null);
+    setGalleryImages([]);
+    setCurrentImageIndex(0);
+  };
+
+  const copyImageUrl = (url) => {
+    navigator.clipboard.writeText(url);
+    // Could add a toast notification here
+    console.log('Image URL copied:', url);
+  };
 
   // Analytics handlers
   const handleSearchChange = useCallback((value) => {
@@ -347,24 +445,43 @@ const ProjectPageUser = () => {
                   className="bg-gray-800 rounded-xl overflow-hidden shadow-lg hover:shadow-indigo-500/20 transition-shadow duration-300 border border-gray-700 hover:border-indigo-500"
                 >
                   {/* Project Image */}
-                  <div className="relative h-48 bg-gray-700 overflow-hidden">
+                  <div className="relative h-48 bg-gray-700 overflow-hidden group">
                     {project.image_url ? (
                       <img
                         src={project.image_url}
                         alt={project.title}
-                        className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         loading="lazy"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-500">
-                        No Image Available
+                        <FaImage className="text-4xl" />
                       </div>
                     )}
+                    
+                    {/* Gallery indicator */}
+                    {additionalImages[project.id] && additionalImages[project.id].length > 0 && (
+                      <div className="absolute top-3 right-3 bg-black/70 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
+                        <FaImages />
+                        {additionalImages[project.id].length + 1}
+                      </div>
+                    )}
+                    
                     {isNew(project.created_at) && (
-                      <div className="absolute top-3 right-3 bg-yellow-500 text-gray-900 text-xs font-bold px-2 py-1 rounded-full shadow">
+                      <div className="absolute top-3 left-3 bg-yellow-500 text-gray-900 text-xs font-bold px-2 py-1 rounded-full shadow">
                         NEW
                       </div>
                     )}
+                    
+                    {/* Gallery overlay button */}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                      <button
+                        onClick={() => openGalleryModal(project)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                      >
+                        <FaEye /> View Gallery
+                      </button>
+                    </div>
                   </div>
 
                   {/* Project Content */}
@@ -389,7 +506,7 @@ const ProjectPageUser = () => {
                           Technologies
                         </h4>
                         <div className="flex flex-wrap gap-2">
-                          {project.tech_stack.split(",").map((tech) => (
+                          {project.tech_stack.split(",").slice(0, 3).map((tech) => (
                             <Tooltip key={tech} content={tech.trim()}>
                               <span 
                                 className="bg-indigo-900/50 text-indigo-300 text-xs px-3 py-1 rounded-full cursor-pointer hover:bg-indigo-800/50"
@@ -399,7 +516,47 @@ const ProjectPageUser = () => {
                               </span>
                             </Tooltip>
                           ))}
+                          {project.tech_stack.split(",").length > 3 && (
+                            <span className="bg-gray-700 text-gray-400 text-xs px-3 py-1 rounded-full">
+                              +{project.tech_stack.split(",").length - 3}
+                            </span>
+                          )}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Additional images preview */}
+                    {additionalImages[project.id] && additionalImages[project.id].length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-xs text-gray-500 uppercase font-semibold mb-2">
+                          Gallery Preview
+                        </h4>
+                        <div className="flex gap-1 mb-2">
+                          {additionalImages[project.id].slice(0, 4).map((img, idx) => (
+                            <div
+                              key={img.id}
+                              className="w-8 h-8 rounded border border-gray-600 overflow-hidden cursor-pointer hover:scale-110 transition-transform"
+                              onClick={() => openGalleryModal(project)}
+                            >
+                              <img
+                                src={img.image_url}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ))}
+                          {additionalImages[project.id].length > 4 && (
+                            <div 
+                              className="w-8 h-8 rounded border border-gray-600 bg-gray-700 flex items-center justify-center text-xs text-gray-400 cursor-pointer hover:bg-gray-600"
+                              onClick={() => openGalleryModal(project)}
+                            >
+                              +{additionalImages[project.id].length - 4}
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {additionalImages[project.id].length} additional image{additionalImages[project.id].length !== 1 ? 's' : ''}
+                        </p>
                       </div>
                     )}
 
@@ -432,6 +589,14 @@ const ProjectPageUser = () => {
                             </a>
                           </Tooltip>
                         )}
+                        <Tooltip content="View gallery">
+                          <button
+                            onClick={() => openGalleryModal(project)}
+                            className="text-gray-400 hover:text-white transition-colors"
+                          >
+                            <FaImages className="text-xl" />
+                          </button>
+                        </Tooltip>
                       </div>
                       {project.details_link && (
                         <a
@@ -531,6 +696,138 @@ const ProjectPageUser = () => {
           </motion.div>
         )}
       </main>
+
+      {/* Project Gallery Modal */}
+      <AnimatePresence>
+        {showGalleryModal && selectedProject && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center z-50 p-4"
+            onClick={closeGalleryModal}
+          >
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.8 }}
+              className="bg-gray-800 rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center p-6 border-b border-gray-700">
+                <div>
+                  <h2 className="text-xl font-bold text-white">{selectedProject.title}</h2>
+                  <p className="text-gray-400 text-sm">Project Gallery</p>
+                </div>
+                <button
+                  onClick={closeGalleryModal}
+                  className="text-gray-400 hover:text-white p-2"
+                >
+                  <FaTimes size={20} />
+                </button>
+              </div>
+
+              <div className="flex h-[600px]">
+                {/* Main Image Display */}
+                <div className="flex-1 flex flex-col">
+                  <div className="flex-1 relative bg-gray-900 flex items-center justify-center">
+                    {galleryImages.length > 0 && (
+                      <>
+                        <img
+                          src={galleryImages[currentImageIndex]?.image_url}
+                          alt={`${selectedProject.title} ${currentImageIndex + 1}`}
+                          className="max-w-full max-h-full object-contain"
+                        />
+                        
+                        {/* Navigation arrows */}
+                        {galleryImages.length > 1 && (
+                          <>
+                            <button
+                              onClick={prevImage}
+                              className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors"
+                            >
+                              <FaChevronLeft />
+                            </button>
+                            <button
+                              onClick={nextImage}
+                              className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors"
+                            >
+                              <FaChevronRight />
+                            </button>
+                          </>
+                        )}
+                        
+                        {/* Image counter */}
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-full text-sm">
+                          {currentImageIndex + 1} / {galleryImages.length}
+                          {galleryImages[currentImageIndex]?.isMain && (
+                            <span className="ml-2 text-yellow-400">(Main)</span>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Current Image Actions */}
+                  {galleryImages[currentImageIndex] && (
+                    <div className="p-4 bg-gray-900 border-t border-gray-700">
+                      <div className="flex justify-between items-center">
+                        <button
+                          onClick={() => copyImageUrl(galleryImages[currentImageIndex].image_url)}
+                          className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2"
+                        >
+                          <FaCopy /> Copy URL
+                        </button>
+                        
+                        <div className="text-gray-400 text-sm">
+                          {galleryImages[currentImageIndex]?.isMain ? 'Main Project Image' : 'Additional Image'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sidebar with thumbnails */}
+                <div className="w-80 bg-gray-900 border-l border-gray-700 flex flex-col">
+                  <div className="flex-1 overflow-y-auto p-4">
+                    <h3 className="text-lg font-semibold text-white mb-3">
+                      All Images ({galleryImages.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {galleryImages.map((img, index) => (
+                        <div
+                          key={img.id}
+                          onClick={() => setCurrentImageIndex(index)}
+                          className={clsx(
+                            "relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all",
+                            currentImageIndex === index
+                              ? "border-indigo-500"
+                              : "border-gray-600 hover:border-gray-500"
+                          )}
+                        >
+                          <div className="aspect-video">
+                            <img
+                              src={img.image_url}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          {img.isMain && (
+                            <div className="absolute top-2 left-2 bg-yellow-500 text-black px-2 py-1 rounded text-xs font-bold">
+                              MAIN
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

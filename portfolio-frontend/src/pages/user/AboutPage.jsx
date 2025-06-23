@@ -93,17 +93,17 @@ const AboutPage = () => {
     trackResumeDownload();
   };
 
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+      <div className="bg-gray-900 text-white min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <FaSpinner className="animate-spin text-4xl text-indigo-400 mb-4 mx-auto" />
-          <p className="text-gray-400">Loading profile information...</p>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+          <p className="text-gray-300">Loading profile information...</p>
         </div>
       </div>
     );
   }
-
   if (error || !about) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
@@ -153,7 +153,7 @@ const AboutPage = () => {
               <div className="relative mb-6">
                 <div className="w-48 h-48 mx-auto relative">
                   <img
-                    src={about.profile_image || "/default-avatar.png"}
+                    src={about.profile_image || "/image_mahmood.PNG"}
                     alt={about.full_name || "Profile"}
                     className="w-full h-full rounded-full object-cover border-4 border-indigo-500 shadow-xl"
                   />

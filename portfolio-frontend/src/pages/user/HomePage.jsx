@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   FaEnvelope,
   FaGithub,
@@ -25,6 +25,9 @@ import {
   FaMapMarkerAlt,
   FaPhone,
   FaWhatsapp,
+  FaImages,
+  FaTimes,
+  FaEye,
 } from "react-icons/fa";
 
 import {
@@ -65,6 +68,13 @@ const HomePage = () => {
   const [analytics, setAnalytics] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // New states for project gallery functionality
+  const [additionalImages, setAdditionalImages] = useState({});
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
+  const [galleryImages, setGalleryImages] = useState([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true);
@@ -76,18 +86,18 @@ const HomePage = () => {
           blogCnt,
           msgCnt,
           testCnt,
-
+          
           // Main content
           projList,
           testList,
           aboutData,
           blogList,
           galleryList,
-
+          
           // Charts
           projChart,
           msgChart,
-
+          
           // Profile data
           skillsList,
           experienceList,
@@ -97,28 +107,22 @@ const HomePage = () => {
           analyticsData,
         ] = await Promise.all([
           // Stats endpoints
-          API.get("/stats/projects-count").catch(() => ({
-            data: { count: 0 },
-          })),
+          API.get("/stats/projects-count").catch(() => ({ data: { count: 0 } })),
           API.get("/stats/blog-count").catch(() => ({ data: { count: 0 } })),
-          API.get("/stats/messages-count").catch(() => ({
-            data: { count: 0 },
-          })),
-          API.get("/stats/testimonials-count").catch(() => ({
-            data: { count: 0 },
-          })),
-
+          API.get("/stats/messages-count").catch(() => ({ data: { count: 0 } })),
+          API.get("/stats/testimonials-count").catch(() => ({ data: { count: 0 } })),
+          
           // Main content endpoints
           API.get("/projects").catch(() => ({ data: [] })),
           API.get("/testimonials").catch(() => ({ data: [] })),
           API.get("/about").catch(() => ({ data: {} })),
           API.get("/blog").catch(() => ({ data: [] })),
           API.get("/gallery").catch(() => ({ data: [] })),
-
+          
           // Chart data endpoints
           API.get("/stats/projects-per-month").catch(() => ({ data: [] })),
           API.get("/stats/messages-per-month").catch(() => ({ data: [] })),
-
+          
           // Profile data endpoints
           API.get("/skills").catch(() => ({ data: [] })),
           API.get("/experience").catch(() => ({ data: [] })),
@@ -135,7 +139,22 @@ const HomePage = () => {
         setTestimonialsCount(testCnt.data.count || 0);
 
         // Set main content
-        setProjects(projList.data?.slice(0, 3) || []);
+        const projectsData = projList.data?.slice(0, 3) || [];
+        setProjects(projectsData);
+        
+        // Fetch additional images for each project
+        const imagesCount = {};
+        for (const project of projectsData) {
+          try {
+            const imagesRes = await API.get(`/projects/${project.id}/images`);
+            imagesCount[project.id] = imagesRes.data;
+          } catch (err) {
+            console.error(`Error fetching images for project ${project.id}:`, err);
+            imagesCount[project.id] = [];
+          }
+        }
+        setAdditionalImages(imagesCount);
+        
         setTestimonials(testList.data?.slice(0, 3) || []);
         setAboutInfo(aboutData.data || {});
         setBlogPosts(blogList.data?.slice(0, 3) || []);
@@ -148,12 +167,8 @@ const HomePage = () => {
         const months = projChart.data?.map((p) => p.month) || [];
         const merged = months.map((month) => ({
           month,
-          projects: +(
-            projChart.data?.find((p) => p.month === month)?.count || 0
-          ),
-          messages: +(
-            msgChart.data?.find((m) => m.month === month)?.count || 0
-          ),
+          projects: +(projChart.data?.find((p) => p.month === month)?.count || 0),
+          messages: +(msgChart.data?.find((m) => m.month === month)?.count || 0),
         }));
         setChartData(merged);
 
@@ -182,9 +197,7 @@ const HomePage = () => {
     return [
       {
         icon: <FaEnvelope />,
-        url: aboutInfo.email
-          ? `mailto:${aboutInfo.email}`
-          : "mailto:mahmoud@example.com",
+        url: aboutInfo.email ? `mailto:${aboutInfo.email}` : "mailto:mahmoud@example.com",
         tooltip: "Email Me",
       },
       {
@@ -194,8 +207,7 @@ const HomePage = () => {
       },
       {
         icon: <FaLinkedin />,
-        url:
-          aboutInfo.linkedin_link || "https://linkedin.com/in/mahmoud-mustafa",
+        url: aboutInfo.linkedin_link || "https://linkedin.com/in/mahmoud-mustafa",
         tooltip: "LinkedIn Profile",
       },
       {
@@ -203,16 +215,72 @@ const HomePage = () => {
         url: aboutInfo.twitter_link || "https://twitter.com/mahmoud_dev",
         tooltip: "Twitter Profile",
       },
-      ...(aboutInfo.whatsapp_link
-        ? [
-            {
-              icon: <FaWhatsapp />,
-              url: aboutInfo.whatsapp_link,
-              tooltip: "WhatsApp",
-            },
-          ]
-        : []),
+      ...(aboutInfo.whatsapp_link ? [{
+        icon: <FaWhatsapp />,
+        url: aboutInfo.whatsapp_link,
+        tooltip: "WhatsApp",
+      }] : []),
     ];
+  };
+
+  // Gallery functions for projects
+  const fetchProjectImages = async (projectId) => {
+    try {
+      const res = await API.get(`/projects/${projectId}/images`);
+      return res.data;
+    } catch (err) {
+      console.error("Error fetching project images:", err);
+      return [];
+    }
+  };
+
+  const openGalleryModal = async (project) => {
+    setSelectedProject(project);
+    setShowGalleryModal(true);
+    
+    // Fetch all images for the project
+    const images = await fetchProjectImages(project.id);
+    const allImages = [];
+    
+    // Add main image first
+    if (project.image_url) {
+      allImages.push({
+        id: 'main',
+        image_url: project.image_url,
+        isMain: true,
+        created_at: project.created_at
+      });
+    }
+    
+    // Add additional images
+    images.forEach(img => {
+      allImages.push({
+        ...img,
+        isMain: false
+      });
+    });
+    
+    setGalleryImages(allImages);
+    setCurrentImageIndex(0);
+  };
+
+  const nextImage = () => {
+    setCurrentImageIndex((prev) => 
+      prev === galleryImages.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  const prevImage = () => {
+    setCurrentImageIndex((prev) => 
+      prev === 0 ? galleryImages.length - 1 : prev - 1
+    );
+  };
+
+  const closeGalleryModal = () => {
+    setShowGalleryModal(false);
+    setSelectedProject(null);
+    setGalleryImages([]);
+    setCurrentImageIndex(0);
   };
 
   if (loading) {
@@ -256,10 +324,7 @@ const HomePage = () => {
           data-aos="fade-up"
           data-aos-delay="400"
         >
-          {aboutInfo.bio ||
-            `Full Stack Developer with ${
-              new Date().getFullYear() - 2015
-            }+ years of experience | Passionate about modern web technologies, AI, and clean UI | Creating digital experiences that matter`}
+          {aboutInfo.bio || `Full Stack Developer with ${new Date().getFullYear() - 2015}+ years of experience | Passionate about modern web technologies, AI, and clean UI | Creating digital experiences that matter`}
         </p>
 
         {/* Location and Contact Info */}
@@ -339,16 +404,8 @@ const HomePage = () => {
           {[
             { value: projectsCount, label: "Projects", icon: <FaCode /> },
             { value: blogCount, label: "Blog Posts", icon: <FaBlog /> },
-            {
-              value: testimonialsCount,
-              label: "Testimonials",
-              icon: <FaQuoteLeft />,
-            },
-            {
-              value: messagesCount,
-              label: "Messages",
-              icon: <FaEnvelopeOpenText />,
-            },
+            { value: testimonialsCount, label: "Testimonials", icon: <FaQuoteLeft /> },
+            { value: messagesCount, label: "Messages", icon: <FaEnvelopeOpenText /> },
           ].map((item, idx) => (
             <motion.div
               key={idx}
@@ -508,10 +565,24 @@ const HomePage = () => {
                         <FaImage className="text-4xl" />
                       </div>
                     )}
+                    
+                    {/* Gallery indicator */}
+                    {additionalImages[project.id] && additionalImages[project.id].length > 0 && (
+                      <div className="absolute top-3 right-3 bg-black/70 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
+                        <FaImages />
+                        {additionalImages[project.id].length + 1}
+                      </div>
+                    )}
+                    
                     <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-6">
-                      <button className="text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                        View Details
-                      </button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => openGalleryModal(project)}
+                          className="text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                        >
+                          <FaEye /> Gallery
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -523,9 +594,7 @@ const HomePage = () => {
                         </h3>
                         {project.created_at && (
                           <span className="text-xs text-gray-500 whitespace-nowrap ml-2">
-                            {new Date(project.created_at).toLocaleDateString(
-                              "en-US"
-                            )}
+                            {new Date(project.created_at).toLocaleDateString("en-US")}
                           </span>
                         )}
                       </div>
@@ -555,6 +624,38 @@ const HomePage = () => {
                             </span>
                           )}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Additional images preview */}
+                    {additionalImages[project.id] && additionalImages[project.id].length > 0 && (
+                      <div className="mb-3">
+                        <div className="flex gap-1 mb-2">
+                          {additionalImages[project.id].slice(0, 4).map((img, idx) => (
+                            <div
+                              key={img.id}
+                              className="w-8 h-8 rounded border border-gray-600 overflow-hidden cursor-pointer hover:scale-110 transition-transform"
+                              onClick={() => openGalleryModal(project)}
+                            >
+                              <img
+                                src={img.image_url}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ))}
+                          {additionalImages[project.id].length > 4 && (
+                            <div 
+                              className="w-8 h-8 rounded border border-gray-600 bg-gray-700 flex items-center justify-center text-xs text-gray-400 cursor-pointer hover:bg-gray-600"
+                              onClick={() => openGalleryModal(project)}
+                            >
+                              +{additionalImages[project.id].length - 4}
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {additionalImages[project.id].length} additional image{additionalImages[project.id].length !== 1 ? 's' : ''}
+                        </p>
                       </div>
                     )}
 
@@ -709,7 +810,7 @@ const HomePage = () => {
               </motion.div>
             ))}
           </div>
-
+          
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -728,7 +829,118 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Recommended Links Section (if available) */}
+      {/* Project Gallery Modal */}
+      <AnimatePresence>
+        {showGalleryModal && selectedProject && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center z-50 p-4"
+            onClick={closeGalleryModal}
+          >
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.8 }}
+              className="bg-gray-800 rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center p-6 border-b border-gray-700">
+                <div>
+                  <h2 className="text-xl font-bold text-white">{selectedProject.title}</h2>
+                  <p className="text-gray-400 text-sm">Project Gallery</p>
+                </div>
+                <button
+                  onClick={closeGalleryModal}
+                  className="text-gray-400 hover:text-white p-2"
+                >
+                  <FaTimes size={20} />
+                </button>
+              </div>
+
+              <div className="flex h-[600px]">
+                {/* Main Image Display */}
+                <div className="flex-1 flex flex-col">
+                  <div className="flex-1 relative bg-gray-900 flex items-center justify-center">
+                    {galleryImages.length > 0 && (
+                      <>
+                        <img
+                          src={galleryImages[currentImageIndex]?.image_url}
+                          alt={`${selectedProject.title} ${currentImageIndex + 1}`}
+                          className="max-w-full max-h-full object-contain"
+                        />
+                        
+                        {/* Navigation arrows */}
+                        {galleryImages.length > 1 && (
+                          <>
+                            <button
+                              onClick={prevImage}
+                              className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors"
+                            >
+                              <FaChevronLeft />
+                            </button>
+                            <button
+                              onClick={nextImage}
+                              className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-colors"
+                            >
+                              <FaChevronRight />
+                            </button>
+                          </>
+                        )}
+                        
+                        {/* Image counter */}
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-full text-sm">
+                          {currentImageIndex + 1} / {galleryImages.length}
+                          {galleryImages[currentImageIndex]?.isMain && (
+                            <span className="ml-2 text-yellow-400">(Main)</span>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sidebar with thumbnails */}
+                <div className="w-80 bg-gray-900 border-l border-gray-700 flex flex-col">
+                  <div className="flex-1 overflow-y-auto p-4">
+                    <h3 className="text-lg font-semibold text-white mb-3">
+                      All Images ({galleryImages.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {galleryImages.map((img, index) => (
+                        <div
+                          key={img.id}
+                          onClick={() => setCurrentImageIndex(index)}
+                          className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
+                            currentImageIndex === index
+                              ? "border-indigo-500"
+                              : "border-gray-600 hover:border-gray-500"
+                          }`}
+                        >
+                          <div className="aspect-video">
+                            <img
+                              src={img.image_url}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          {img.isMain && (
+                            <div className="absolute top-2 left-2 bg-yellow-500 text-black px-2 py-1 rounded text-xs font-bold">
+                              MAIN
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

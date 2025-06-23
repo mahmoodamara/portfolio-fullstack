@@ -306,15 +306,12 @@ const ResumePage = () => {
     trackSkillInteraction(skillName, level);
   };
 
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex items-center justify-center">
+      <div className="bg-gray-900 text-white min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="w-16 h-16 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full mb-8 mx-auto"
-          />
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-500 mx-auto mb-4"></div>
           <p className="text-gray-400 text-lg">Loading your professional journey...</p>
         </div>
       </div>
@@ -372,17 +369,8 @@ const ResumePage = () => {
               Explore my career evolution, educational milestones, and technical expertise
             </motion.p>
             
-            <motion.button
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.95 }}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.7 }}
-              className="inline-flex items-center bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-indigo-500/50"
-            >
-              <FaDownload className="mr-2" />
-              Download Resume
-            </motion.button>
+
+            
           </motion.div>
 
           {/* Stats Overview */}
